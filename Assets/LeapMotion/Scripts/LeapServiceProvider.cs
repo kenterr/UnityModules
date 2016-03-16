@@ -209,7 +209,8 @@ namespace Leap.Unity {
       _currentUpdateCount = Time.frameCount;
 
       var leapMat = UnityMatrixExtension.GetLeapMatrix(transform);
-      _currentFrame = GetLeapController().GetTransformedFrame(leapMat, 0);
+      GetLeapController().TransformFrameInto(_currentFrame, leapMat, 0);
+
     }
 
     /* Calling this method updates _currentFixedFrame if and only if this is the first time
@@ -244,7 +245,7 @@ namespace Leap.Unity {
         }
       }
       var leapMat = UnityMatrixExtension.GetLeapMatrix(transform);
-      _currentFixedFrame = closestFrame.TransformedCopy(leapMat);
+      _currentFixedFrame.CopyTransformedProperties(closestFrame, leapMat);
     }
   }
 }

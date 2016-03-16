@@ -105,7 +105,7 @@ namespace Leap.Unity{
   
     private void updateSpheres() {
       //Update all spheres
-      List<Finger> fingers = hand_.Fingers;
+      FingerList fingers = hand_.Fingers;
       for (int i = 0; i < fingers.Count; i++) {
         Finger finger = fingers[i];
         for (int j = 0; j < 4; j++) {
@@ -129,7 +129,7 @@ namespace Leap.Unity{
   
     private void updateArm() {
       var arm = hand_.Arm;
-      Vector3 right = arm.Basis.xBasis.ToVector3().normalized * arm.Width * 0.7f * 0.5f;
+      Vector3 right = arm.Basis.xBasis.ToVector3() * 0.7f * 0.5f;
       Vector3 wrist = arm.WristPosition.ToVector3();
       Vector3 elbow = arm.ElbowPosition.ToVector3();
   
@@ -186,7 +186,7 @@ namespace Leap.Unity{
   
     private void createSpheres() {
       //Create spheres for finger joints
-      List<Finger> fingers = hand_.Fingers;
+      FingerList fingers = hand_.Fingers;
       for (int i = 0; i < fingers.Count; i++) {
         Finger finger = fingers[i];
         for (int j = 0; j < 4; j++) {
