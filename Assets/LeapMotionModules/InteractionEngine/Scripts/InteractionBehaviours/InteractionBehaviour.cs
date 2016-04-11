@@ -35,6 +35,8 @@ namespace Leap.Unity.Interaction {
     protected Dictionary<int, HandPointCollection> _handIdToPoints;
     protected LEAP_IE_KABSCH _kabsch;
 
+    protected Rigidbody _drivingBody;
+
     protected Bounds _debugBounds;
 
     #region PUBLIC METHODS
@@ -126,20 +128,27 @@ namespace Leap.Unity.Interaction {
 #endif
     }
 
-    public override void OnInteractionShapeUpdate(out INTERACTION_UPDATE_SHAPE_INFO updateInfo, out INTERACTION_TRANSFORM interactionTrasnform) {
+    public override void OnInteractionShapeUpdate(out INTERACTION_UPDATE_SHAPE_INFO updateInfo, out INTERACTION_TRANSFORM interactionTransform) {
       updateInfo = new INTERACTION_UPDATE_SHAPE_INFO();
       updateInfo.updateFlags = _notifiedOfTeleport ? UpdateInfoFlags.ResetVelocity : UpdateInfoFlags.ApplyAcceleration;
       updateInfo.linearAcceleration = _accumulatedLinearAcceleration.ToCVector();
       updateInfo.angularAcceleration = _accumulatedAngularAcceleration.ToCVector();
 
-      interactionTrasnform = getRigidbodyTransform();
+      if (_drivingBody != null) {
+        interactionTransform = new INTERACTION_TRANSFORM();
+        interactionTransform.position = _drivingBody.position.ToCVector();
+        interactionTransform.rotation = _drivingBody.rotation.ToCQuaternion();
+        interactionTransform.wallTime = Time.fixedTime;
+      } else {
+        interactionTransform = getRigidbodyTransform();
+      }
     }
 
     public override void OnRecieveSimulationResults(INTERACTION_SHAPE_INSTANCE_RESULTS results) {
       base.OnRecieveSimulationResults(results);
 
       if ((results.resultFlags & ShapeInstanceResultFlags.Velocities) != 0) {
-        _rigidbody.Sleep();
+        //_rigidbody.Sleep();
         _rigidbody.velocity = results.linearVelocity.ToVector3();
         _rigidbody.angularVelocity = results.angularVelocity.ToVector3();
         _recievedVelocityUpdate = true;
@@ -172,6 +181,8 @@ namespace Leap.Unity.Interaction {
     public override void OnHandsHold(List<Hand> hands) {
       base.OnHandsHold(hands);
 
+      float disparity = (_drivingBody.position - _rigidbody.position).magnitude;
+
       //Get old transform
       Vector3 oldPosition = _rigidbody.position;
       Quaternion oldRotation = _rigidbody.rotation;
@@ -186,16 +197,18 @@ namespace Leap.Unity.Interaction {
       Quaternion newRotation = solvedRotation * oldRotation;
 
       //Apply new transform to object
-      if (_notifiedOfTeleport) {
-        _rigidbody.position = newPosition;
-        _rigidbody.rotation = newRotation;
-      } else {
-        _rigidbody.MovePosition(newPosition);
-        _rigidbody.MoveRotation(newRotation);
-      }
+      _drivingBody.MovePosition(newPosition);
+      _drivingBody.MoveRotation(newRotation);
 
-      _graphicalAnchor.position = newPosition;
-      _graphicalAnchor.rotation = newRotation;
+      Debug.Log(disparity);
+      if (disparity < 0.0001f) {
+        Debug.DrawRay(newPosition, Vector3.up, Color.red);
+        _graphicalAnchor.position = newPosition;
+        _graphicalAnchor.rotation = newRotation;
+      } else {
+        _graphicalAnchor.localPosition = Vector3.zero;
+        _graphicalAnchor.localRotation = Quaternion.identity;
+      }
     }
 
     public override void OnHandRelease(Hand hand) {
@@ -233,17 +246,27 @@ namespace Leap.Unity.Interaction {
     protected override void OnGraspBegin() {
       base.OnGraspBegin();
 
-      if (!_isKinematic) {
-        _rigidbody.isKinematic = true;
-      }
+      _rigidbody.isKinematic = false;
+
+      GameObject drivingObj = new GameObject("Driving Obj");
+      drivingObj.transform.position = _rigidbody.position;
+      drivingObj.transform.rotation = _rigidbody.rotation;
+      drivingObj.transform.localScale = Vector3.zero;
+
+      _drivingBody = drivingObj.AddComponent<Rigidbody>();
+      FixedJoint joint = drivingObj.AddComponent<FixedJoint>();
+      joint.connectedBody = _rigidbody;
     }
 
     protected override void OnGraspEnd() {
       base.OnGraspEnd();
 
-      if (!_isKinematic) {
-        _rigidbody.isKinematic = false;
-      }
+      _rigidbody.isKinematic = _isKinematic;
+
+      DestroyImmediate(_drivingBody.gameObject);
+
+      _graphicalAnchor.localPosition = Vector3.zero;
+      _graphicalAnchor.localRotation = Quaternion.identity;
     }
     #endregion
 
