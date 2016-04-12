@@ -35,8 +35,6 @@ namespace Leap.Unity.Interaction {
     protected Dictionary<int, HandPointCollection> _handIdToPoints;
     protected LEAP_IE_KABSCH _kabsch;
 
-    protected Rigidbody _drivingBody;
-
     protected Bounds _debugBounds;
 
     #region PUBLIC METHODS
@@ -134,20 +132,13 @@ namespace Leap.Unity.Interaction {
       updateInfo.linearAcceleration = _accumulatedLinearAcceleration.ToCVector();
       updateInfo.angularAcceleration = _accumulatedAngularAcceleration.ToCVector();
 
-      if (_drivingBody != null) {
-        interactionTransform = new INTERACTION_TRANSFORM();
-        interactionTransform.position = _drivingBody.position.ToCVector();
-        interactionTransform.rotation = _drivingBody.rotation.ToCQuaternion();
-        interactionTransform.wallTime = Time.fixedTime;
-      } else {
-        interactionTransform = getRigidbodyTransform();
-      }
+      interactionTransform = getRigidbodyTransform();
     }
 
     public override void OnRecieveSimulationResults(INTERACTION_SHAPE_INSTANCE_RESULTS results) {
       base.OnRecieveSimulationResults(results);
 
-      if ((results.resultFlags & ShapeInstanceResultFlags.Velocities) != 0) {
+      if ((results.resultFlags & ShapeInstanceResultFlags.Velocities) != 0 && !IsBeingGrasped) {
         //_rigidbody.Sleep();
         _rigidbody.velocity = results.linearVelocity.ToVector3();
         _rigidbody.angularVelocity = results.angularVelocity.ToVector3();
@@ -178,37 +169,26 @@ namespace Leap.Unity.Interaction {
       }
     }
 
-    public override void OnHandsHold(List<Hand> hands) {
-      base.OnHandsHold(hands);
+    public override void OnHandsHoldPhysical(List<Hand> hands) {
+      base.OnHandsHoldPhysical(hands);
 
-      float disparity = (_drivingBody.position - _rigidbody.position).magnitude;
+      Vector3 newPosition, solvedTranslation;
+      Quaternion newRotation, solvedRotation;
+      getSolvedTransform(hands, out newPosition, out newRotation, out solvedTranslation, out solvedRotation);
 
-      //Get old transform
-      Vector3 oldPosition = _rigidbody.position;
-      Quaternion oldRotation = _rigidbody.rotation;
+      _rigidbody.MovePosition(newPosition);
+      _rigidbody.MoveRotation(newRotation);
+    }
 
-      //Get solved transform deltas
-      Vector3 solvedTranslation;
-      Quaternion solvedRotation;
-      getSolvedTransform(hands, oldPosition, out solvedTranslation, out solvedRotation);
+    public override void OnHandsHoldGraphical(List<Hand> hands) {
+      base.OnHandsHoldGraphical(hands);
 
-      //Calculate new transform using delta
-      Vector3 newPosition = oldPosition + solvedTranslation;
-      Quaternion newRotation = solvedRotation * oldRotation;
+      Vector3 newPosition, solvedTranslation;
+      Quaternion newRotation, solvedRotation;
+      getSolvedTransform(hands, out newPosition, out newRotation, out solvedTranslation, out solvedRotation);
 
-      //Apply new transform to object
-      _drivingBody.MovePosition(newPosition);
-      _drivingBody.MoveRotation(newRotation);
-
-      Debug.Log(disparity);
-      if (disparity < 0.0001f) {
-        Debug.DrawRay(newPosition, Vector3.up, Color.red);
-        _graphicalAnchor.position = newPosition;
-        _graphicalAnchor.rotation = newRotation;
-      } else {
-        _graphicalAnchor.localPosition = Vector3.zero;
-        _graphicalAnchor.localRotation = Quaternion.identity;
-      }
+      _graphicalAnchor.position = newPosition;
+      _graphicalAnchor.rotation = newRotation;
     }
 
     public override void OnHandRelease(Hand hand) {
@@ -246,24 +226,13 @@ namespace Leap.Unity.Interaction {
     protected override void OnGraspBegin() {
       base.OnGraspBegin();
 
-      _rigidbody.isKinematic = false;
-
-      GameObject drivingObj = new GameObject("Driving Obj");
-      drivingObj.transform.position = _rigidbody.position;
-      drivingObj.transform.rotation = _rigidbody.rotation;
-      drivingObj.transform.localScale = Vector3.zero;
-
-      _drivingBody = drivingObj.AddComponent<Rigidbody>();
-      FixedJoint joint = drivingObj.AddComponent<FixedJoint>();
-      joint.connectedBody = _rigidbody;
+      _rigidbody.isKinematic = true;
     }
 
     protected override void OnGraspEnd() {
       base.OnGraspEnd();
 
       _rigidbody.isKinematic = _isKinematic;
-
-      DestroyImmediate(_drivingBody.gameObject);
 
       _graphicalAnchor.localPosition = Vector3.zero;
       _graphicalAnchor.localRotation = Quaternion.identity;
@@ -278,9 +247,11 @@ namespace Leap.Unity.Interaction {
     protected virtual void OnDrawGizmos() {
       Matrix4x4 gizmosMatrix = Gizmos.matrix;
 
-      Gizmos.matrix = Matrix4x4.TRS(transform.position, transform.rotation, Vector3.one);
-      Gizmos.color = IsBeingGrasped ? Color.green : Color.blue;
-      Gizmos.DrawWireCube(_debugBounds.center, _debugBounds.size);
+      if (_rigidbody != null) {
+        Gizmos.matrix = Matrix4x4.TRS(_rigidbody.position, _rigidbody.rotation, Vector3.one);
+        Gizmos.color = IsBeingGrasped ? Color.green : Color.blue;
+        Gizmos.DrawWireCube(_debugBounds.center, _debugBounds.size);
+      }
 
       Gizmos.matrix = gizmosMatrix;
     }
@@ -310,7 +281,10 @@ namespace Leap.Unity.Interaction {
       HandPointCollection.Return(collection);
     }
 
-    protected void getSolvedTransform(List<Hand> hands, Vector3 oldPosition, out Vector3 translation, out Quaternion rotation) {
+    protected void getSolvedTransform(List<Hand> hands, out Vector3 newPosition, out Quaternion newRotation, out Vector3 solvedTranslation, out Quaternion solvedRotation) {
+      Vector3 oldPosition = _rigidbody.position;
+      Quaternion oldRotation = _rigidbody.rotation;
+
       KabschC.Reset(ref _kabsch);
 
       for (int h = 0; h < hands.Count; h++) {
@@ -346,8 +320,11 @@ namespace Leap.Unity.Interaction {
       KabschC.GetTranslation(ref _kabsch, out leapTranslation);
       KabschC.GetRotation(ref _kabsch, out leapRotation);
 
-      translation = leapTranslation.ToVector3();
-      rotation = leapRotation.ToQuaternion();
+      solvedTranslation = leapTranslation.ToVector3();
+      solvedRotation = leapRotation.ToQuaternion();
+
+      newPosition = oldPosition + solvedTranslation;
+      newRotation = solvedRotation * oldRotation;
     }
 
     protected class HandPointCollection {

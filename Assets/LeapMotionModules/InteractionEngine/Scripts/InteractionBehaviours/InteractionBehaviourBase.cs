@@ -193,7 +193,9 @@ namespace Leap.Unity.Interaction {
       }
     }
 
-    public virtual void OnHandsHold(List<Hand> hands) { }
+    public virtual void OnHandsHoldPhysical(List<Hand> hands) { }
+
+    public virtual void OnHandsHoldGraphical(List<Hand> hands) { }
 
     public virtual void OnHandRelease(Hand hand) {
       Assert.AreNotEqual(_graspingIds.Count, 0, NoGraspingHandsMessage());

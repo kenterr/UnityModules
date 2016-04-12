@@ -307,7 +307,7 @@ namespace Leap.Unity.Interaction {
     }
 
     protected virtual void LateUpdate() {
-      dispatchOnHandsHolding(_leapProvider.CurrentFrame);
+      dispatchOnHandsHolding(_leapProvider.CurrentFrame, physical: false);
 
       unregisterMisbehavingBehaviours();
     }
@@ -349,7 +349,7 @@ namespace Leap.Unity.Interaction {
         _registeredBehaviours[i].OnPreSolve();
       }
 
-      dispatchOnHandsHolding(frame);
+      dispatchOnHandsHolding(frame, physical: true);
 
       updateInteractionRepresentations();
 
@@ -391,7 +391,7 @@ namespace Leap.Unity.Interaction {
       }
     }
 
-    protected virtual void dispatchOnHandsHolding(Frame frame) {
+    protected virtual void dispatchOnHandsHolding(Frame frame, bool physical) {
       var hands = frame.Hands;
 
       //Loop through the currently grasped objects to dispatch their OnHandsHold callback
@@ -405,7 +405,11 @@ namespace Leap.Unity.Interaction {
         }
 
         try {
-          interactionBehaviour.OnHandsHold(_holdingHands);
+          if (physical) {
+            interactionBehaviour.OnHandsHoldPhysical(_holdingHands);
+          } else {
+            interactionBehaviour.OnHandsHoldGraphical(_holdingHands);
+          }
         } catch (Exception e) {
           _misbehavingBehaviours.Add(interactionBehaviour);
           Debug.LogException(e);
