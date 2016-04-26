@@ -7,6 +7,7 @@
 \******************************************************************************/
 using System;
 using System.Threading;
+using System.Collections;
 
 namespace LeapInternal
 {
@@ -22,7 +23,7 @@ namespace LeapInternal
    * Object types used must have default parameterless constructor. It should be obvious that
    * such default objects are invalid. I.e. for Leap API objects, the IsValid property should be false.
    */
-  public class CircularObjectBuffer<T> where T : new()
+  public class CircularObjectBuffer<T> : IEnumerable where T : new()
   {
     private T[] array;
     private int current = 0;
@@ -98,6 +99,14 @@ namespace LeapInternal
         this.Capacity = newCapacity;
       }
     }
+
+      public IEnumerator GetEnumerator()
+      {
+        for (int index = 0; index < Count; index++)
+        {
+            yield return Get(index);
+        }
+      }
   }
 }
 
