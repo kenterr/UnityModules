@@ -2493,7 +2493,6 @@ GameObject:
   serializedVersion: 4
   m_Component:
   - 4: {fileID: 1192633917}
-  - 114: {fileID: 1192633918}
   m_Layer: 0
   m_Name: World
   m_TagString: Untagged
@@ -2521,18 +2520,6 @@ Transform:
   m_Father: {fileID: 0}
   m_RootOrder: 1
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1192633918
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_PrefabParentObject: {fileID: 0}
-  m_PrefabInternal: {fileID: 0}
-  m_GameObject: {fileID: 1192633916}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 51c99eac09f586a4c9f6841c17f02d1d, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  HeadTrackingNode: {fileID: 266907292}
 --- !u!1 &1211604848
 GameObject:
   m_ObjectHideFlags: 0

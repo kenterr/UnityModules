@@ -143,6 +143,7 @@ namespace Leap.Unity {
 
     private Matrix4x4 _projectionMatrix;
     private List<TransformData> _history = new List<TransformData>();
+    private Vector3 startPos = Vector3.zero;
 
     /// <summary>
     /// Provides the position of a Leap Anchor at a given Leap Time.  Cannot extrapolate.
@@ -238,9 +239,15 @@ namespace Leap.Unity {
         Controller controller = provider.GetLeapController();
         controller.Device += OnDevice;
       }
-    }
+      startPos = transform.parent.parent.position;
+#if UNITY_5_4_OR_NEWER
+      if (VRSettings.loadedDeviceName == "OpenVR") {
+        transform.parent.parent.position += startPos - transform.parent.position;
+      }
+#endif
+        }
 
-    protected void OnDevice(object sender, DeviceEventArgs args) {
+        protected void OnDevice(object sender, DeviceEventArgs args) {
       deviceInfo = provider.GetDeviceInfo();
       if (deviceInfo.type == LeapDeviceType.Invalid) {
         Debug.LogWarning("Invalid Leap Device -> enabled = false");
@@ -270,6 +277,11 @@ namespace Leap.Unity {
     protected void Update() {
       if (Input.GetKeyDown(recenter) && VRSettings.enabled && VRDevice.isPresent) {
         InputTracking.Recenter();
+#if UNITY_5_4_OR_NEWER
+        if (VRSettings.loadedDeviceName == "OpenVR"){
+            transform.parent.parent.position += startPos - transform.parent.position;
+        }
+#endif
       }
 
       // Manual Time Alignment
